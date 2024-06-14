@@ -1,6 +1,6 @@
-# hash:sha256:3f2edeb1f3d714cc708714afc32f6f88dd4ccf22cf674d798725f258e2f5575c
+# hash:sha256:eb28dffec479e186085fe23fea93974eaa683de5dfdb03c4b0dfef9651305b86
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04
+FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG API_KEY

@@ -3,6 +3,6 @@ set -e
 
 git clone https://github.com/AllenNeuralDynamics/aind-codeocean-utils.git
 cd aind-codeocean-utils
-git checkout fcab145843601ff959e1945cd63b543338ab2cfe
+git checkout f42d9339cedcc4c331f8350ff4a65dc47f1f12b7
 pip install .
 cd ..

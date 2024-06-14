@@ -83,8 +83,7 @@ parser.add_argument(
     "input_data_asset_id",
     type=str,
     help=(
-        "Input data asset (if already registered in Code Ocean). "
-        "To attach multiple input data assets, separate them with semicolons."
+        "Input data asset to spike sort"
     ),
     nargs="?",
 )
