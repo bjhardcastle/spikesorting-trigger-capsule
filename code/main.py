@@ -239,13 +239,13 @@ def main():
     job_dispatch_parameters = [job_dispatch_concatenate, job_dispatch_input]
     job_dispatch_process = ComputationProcess(
         name=process_names[pipeline_type]["job_dispatch"],
-        parameters=job_dispatch_parameters
+        parameters=[str(p) for p in job_dispatch_parameters]
     )
 
     nwb_subject_parameters = [nwb_backend]
     nwb_subject_process = ComputationProcess(
         name=process_names[pipeline_type]["nwb_subject"],
-        parameters=nwb_subject_parameters
+        parameters=[str(p) for p in nwb_subject_parameters]
     )
 
     preprocessing_parameters = [
@@ -260,7 +260,7 @@ def main():
     ]
     preprocessing_process = ComputationProcess(
         name=process_names[pipeline_type]["preprocessing"],
-        parameters=preprocessing_parameters
+        parameters=[str(p) for p in preprocessing_parameters]
     )
 
     # TODO: postprocessing
