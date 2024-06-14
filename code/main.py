@@ -236,35 +236,28 @@ def main():
         )
 
     # Update processes with parameters
-    job_dispatch_parameters = ["--input", job_dispatch_input]
-    if job_dispatch_concatenate:
-        job_dispatch_parameters.append("--concatenate")
+    job_dispatch_parameters = [job_dispatch_concatenate, job_dispatch_input]
     job_dispatch_process = ComputationProcess(
         name=process_names[pipeline_type]["job_dispatch"],
         parameters=job_dispatch_parameters
     )
 
-    nwb_subject_parameters = [
-        "--backend", nwb_backend
-    ]
+    nwb_subject_parameters = [nwb_backend]
     nwb_subject_process = ComputationProcess(
         name=process_names[pipeline_type]["nwb_subject"],
         parameters=nwb_subject_parameters
     )
 
     preprocessing_parameters = [
-        "--denoising", preprocessing_denoising,
-        "--max-bad-channel-fraction", preprocessing_max_bad_channel_fraction,
-        "--motion", preprocessing_motion,
-        "--motion-preset", preprocessing_motion_preset,
-        "--debug-duration", preprocessing_debug_duration
+        preprocessing_debug,
+        preprocessing_denoising,
+        preprocessing_remove_out_channels,
+        preprocessing_remove_bad_channels,
+        preprocessing_max_bad_channel_fraction,
+        preprocessing_motion,
+        preprocessing_motion_preset,
+        preprocessing_debug_duration
     ]
-    if preprocessing_debug:
-        preprocessing_parameters.append("--debug")
-    if not preprocessing_remove_out_channels:
-        preprocessing_parameters.append("--no-remove-out-channels")
-    if not preprocessing_remove_bad_channels:
-        preprocessing_parameters.append("--no-remove-bad-channels")
     preprocessing_process = ComputationProcess(
         name=process_names[pipeline_type]["preprocessing"],
         parameters=preprocessing_parameters
