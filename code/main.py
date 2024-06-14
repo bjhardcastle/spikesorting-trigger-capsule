@@ -112,25 +112,25 @@ parser.add_argument(
 # preprocessing
 parser.add_argument(
     "preprocessing-debug",
-    type="str",
+    type=str,
     help="Whether to run in DEBUG mode",
     nargs="?"
 )
 parser.add_argument(
     "preprocessing-denoising",
-    type="str",
+    type=str,
     help="Which denoising strategy to use. Can be 'cmr' or 'destripe'. Default 'cmr'",
     nargs="?"
 )
 parser.add_argument(
     "preprocessing-remove-out-channels",
-    type="str",
+    type=str,
     help="Whether to remove out channels",
     nargs="?"
 )
 parser.add_argument(
     "preprocessing-remove-bad-channels",
-    type="str",
+    type=str,
     help="Whether to remove bad channels",
     nargs="?"
 )
@@ -142,13 +142,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "preprocessing-motion",
-    type="str",
+    type=str,
     help="How to deal with motion correction. Can be 'skip', 'compute', or 'apply'. Default 'compute'",
     nargs="?"
 )
 parser.add_argument(
     "preprocessing-motion-preset",
-    type="str",
+    type=str,
     help="What motion preset to use. Can be 'nonrigid_accurate', 'kilosort_like', or 'nonrigid_fast_and_accurate'. Default 'nonrigid_fast_and_accurate'",
     nargs="?"
 )
@@ -161,7 +161,7 @@ parser.add_argument(
 # postprocessing
 parser.add_argument(
     "postprocessing-use-motion-corrected",
-    type="str",
+    type=str,
     help="Whether to use motion corrected data",
     nargs="?"
 )
