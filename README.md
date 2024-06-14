@@ -1,3 +1,3 @@
-# aind-capsule-template
+# Ecephys Trigger Capsule
 
-Basic structure of a capsule to be customized as needed.
+Capsule to triggere ecepys processing pipeline in Code Ocean.
