@@ -73,7 +73,7 @@ def construct_data_assets(input_id_str, mount_point_str):
 parser = argparse.ArgumentParser(description="Trigger codeocean job")
 
 parser.add_argument(
-    "pipeline-type",
+    "pipeline_type",
     type=str,
     help=(
         "Pipeline to trigger, either 'ecephys' or 'ecephys_opto'."
@@ -91,76 +91,76 @@ parser.add_argument(
 
 # job dispatch
 parser.add_argument(
-    "job-dispatch-concatenate",
+    "job_dispatch_concatenate",
     type=str,
     help="",
     nargs="?",
 )
 parser.add_argument(
-    "job-dispatch-input",
+    "job_dispatch_input",
     type=str,
     help="",
     nargs="?",
 )
 # NWB
 parser.add_argument(
-    "nwb-backend",
+    "nwb_backend",
     type=str,
     help="hdf5 or zarr",
     nargs="?"
 )
 # preprocessing
 parser.add_argument(
-    "preprocessing-debug",
+    "preprocessing_debug",
     type=str,
     help="Whether to run in DEBUG mode",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-denoising",
+    "preprocessing_denoising",
     type=str,
     help="Which denoising strategy to use. Can be 'cmr' or 'destripe'. Default 'cmr'",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-remove-out-channels",
+    "preprocessing_remove_out_channels",
     type=str,
     help="Whether to remove out channels",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-remove-bad-channels",
+    "preprocessing_remove_bad_channels",
     type=str,
     help="Whether to remove bad channels",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-max-bad-channel-fraction",
+    "preprocessing_max_bad_channel_fraction",
     type=float,
     help="Maximum fraction of bad channels to remove. If more than this fraction, processing is skipped",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-motion",
+    "preprocessing_motion",
     type=str,
     help="How to deal with motion correction. Can be 'skip', 'compute', or 'apply'. Default 'compute'",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-motion-preset",
+    "preprocessing_motion_preset",
     type=str,
     help="What motion preset to use. Can be 'nonrigid_accurate', 'kilosort_like', or 'nonrigid_fast_and_accurate'. Default 'nonrigid_fast_and_accurate'",
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing-debug-duration",
+    "preprocessing_debug_duration",
     type=int,
     help="Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled",
     nargs="?"
 )
 # postprocessing
 parser.add_argument(
-    "postprocessing-use-motion-corrected",
+    "postprocessing_use_motion_corrected",
     type=str,
     help="Whether to use motion corrected data",
     nargs="?"
