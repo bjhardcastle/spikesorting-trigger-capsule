@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -ex
 
-# This is the master script for the capsule. When you click "Reproducible Run", the code in this file will execute.
-python -u run_capsule.py "$@"
+# USAGE: Run main with args
+# Example run smartspim pipeline
+# python -u main.py '{"trigger_codeocean_job": {"job_type": "smartspim", "bucket": "aind-open-data", "prefix": "SmartSPIM_661793_2023-02-09_02-05-24", "stitching": {"co_folder": "scratch", "stitch_channel": 0}, "registration": {"channel": "Ex_488_Em_525.zarr", "input_scale": 3}, "segmentation": {"channel": "Ex_488_Em_525", "input_scale": 0, "chunksize": 500}}}'
+
+python -u main.py "$@"

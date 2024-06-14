@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+
+git clone https://github.com/AllenNeuralDynamics/aind-codeocean-utils.git
+cd aind-codeocean-utils
+git checkout fcab145843601ff959e1945cd63b543338ab2cfe
+pip install .
+cd ..
