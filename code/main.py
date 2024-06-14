@@ -153,6 +153,18 @@ parser.add_argument(
     nargs="?"
 )
 parser.add_argument(
+    "preprocessing_t_start",
+    type=str,
+    help="Start time of clipped recording. Default is None",
+    nargs="?"
+)
+parser.add_argument(
+    "preprocessing_t_stop",
+    type=str,
+    help="Stop time of clipped recording. Default is None",
+    nargs="?"
+)
+parser.add_argument(
     "preprocessing_debug_duration",
     type=int,
     help="Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled",
@@ -191,6 +203,8 @@ def main():
     preprocessing_max_bad_channel_fraction = args.preprocessing_max_bad_channel_fraction
     preprocessing_motion = args.preprocessing_motion
     preprocessing_motion_preset = args.preprocessing_motion_preset
+    preprocessing_t_start = args.preprocessing_t_start
+    preprocessing_t_stop = args.preprocessing_t_stop
     preprocessing_debug_duration = args.preprocessing_debug_duration
     postprocessing_use_motion_corrected = args.postprocessing_use_motion_corrected
 
@@ -256,6 +270,8 @@ def main():
         preprocessing_max_bad_channel_fraction,
         preprocessing_motion,
         preprocessing_motion_preset,
+        preprocessing_t_start,
+        preprocessing_t_stop,
         preprocessing_debug_duration
     ]
     preprocessing_process = ComputationProcess(
