@@ -1,4 +1,4 @@
-# hash:sha256:eb28dffec479e186085fe23fea93974eaa683de5dfdb03c4b0dfef9651305b86
+# hash:sha256:5808996b36165c29c8c2404ffd9f3a7557d60046a5834c1ad668a1c1fb65dcb8
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -15,7 +15,5 @@ COPY git-askpass /
 
 RUN pip install -U --no-cache-dir \
     aind-codeocean-api==0.4.0 \
+    aind-codeocean-utils==0.2.0 \
     python-dotenv==1.0.1
-
-COPY postInstall /
-RUN /postInstall

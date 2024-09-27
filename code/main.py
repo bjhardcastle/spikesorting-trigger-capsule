@@ -17,8 +17,10 @@ from aind_codeocean_utils.alert_bot import AlertBot
 from dotenv import load_dotenv
 
 from preconfigured_jobs import (
-    EcephysJob,
-    EcephysOptoJob
+    EcephysKS25Job,
+    EcephysOptoKS25Job,
+    EcephysKS4Job,
+    EcephysSC2Job
 )
 
 LOG_FMT = "%(asctime)s %(message)s"
@@ -30,22 +32,40 @@ logger.setLevel(logging.INFO)
 
 
 valid_job_types = [
-    "ecephys",
-    "ecephys_opto",
+    "ecephys_ks25",
+    "ecephys_opto_ks25",
+    "ecephys_ks4",
+    "ecephys_sc2"
 ]
 
 process_names = dict(
-    ecephys=dict(
+    ecephys_ks25=dict(
         job_dispatch="capsule_aind_ephys_job_dispatch_4",
         nwb_subject="capsule_nwb_packaging_subject_capsule_10",
         preprocessing="capsule_aind_ephys_preprocessing_1",
+        spikesorting="capsule_aind_ephys_spikesort_kilosort_25_7",
         postprocessing="capsule_aind_ephys_postprocessing_5",
     ),
-    ecephys_opto=dict(
+    ecephys_opto_ks25=dict(
         job_dispatch="capsule_aind_ephys_job_dispatch_4",
         nwb_subject="capsule_nwb_packaging_subject_capsule_10",
         preprocessing="capsule_opto_preprocess_ecephys_1",
+        spikesorting="capsule_aind_ephys_spikesort_kilosort_25_7",
         postprocessing="capsule_aind_ephys_postprocessing_5",
+    ),
+    ecephys_ks4=dict(
+        job_dispatch="capsule_job_dispatch_ecephys_1",
+        nwb_subject="capsule_nwb_packaging_subject_capsule_10",
+        preprocessing="capsule_preprocess_ecephys_2",
+        spikesorting="capsule_spikesort_ecephys_kilosort_4_analyzer_11",
+        postprocessing="capsule_postprocess_ecephys_4",
+    ),
+    ecephys_sc2=dict(
+        job_dispatch="capsule_job_dispatch_ecephys_1",
+        nwb_subject="capsule_nwb_packaging_subject_capsule_9",
+        preprocessing="capsule_preprocess_ecephys_2",
+        spikesorting="capsule_spikesort_spyking_circus_2_ecephys_3",
+        postprocessing="capsule_postprocess_ecephys_4",
     ),
 )
 
@@ -76,7 +96,7 @@ parser.add_argument(
     "pipeline_type",
     type=str,
     help=(
-        "Pipeline to trigger, either 'ecephys' or 'ecephys_opto'."
+        "Pipeline to trigger, either 'ecephys_ks25' or 'ecephys_opto_ks25', 'ecephys_ks4', or 'ecephys_sc2'."
     ),
 )
 parser.add_argument(
@@ -87,11 +107,32 @@ parser.add_argument(
     ),
     nargs="?",
 )
+parser.add_argument(
+    "result_suffix",
+    type=str,
+    help=(
+        "If provided, the result suffix to append to the processed data asset. "
+        "Default is 'sorted' for 'ecephys', 'sorted-opto' for 'ecephys_opto'"
+    ),
+    nargs="?",
+)
+parser.add_argument(
+    "output_bucket",
+    type=str,
+    help="Bucket to save data to",
+    nargs="?",
+)
 ## SPIKE SORTING SPECIFIC ARGUMENTS
 
 # job dispatch
 parser.add_argument(
     "job_dispatch_concatenate",
+    type=str,
+    help="",
+    nargs="?",
+)
+parser.add_argument(
+    "job_dispatch_split_groups",
     type=str,
     help="",
     nargs="?",
@@ -120,6 +161,12 @@ parser.add_argument(
     "preprocessing_denoising",
     type=str,
     help="Which denoising strategy to use. Can be 'cmr' or 'destripe'. Default 'cmr'",
+    nargs="?"
+)
+parser.add_argument(
+    "preprocessing_filter_type",
+    type=str,
+    help="Which filter to use. Can be 'highpass' or 'bandpass'. Default 'highpass'",
     nargs="?"
 )
 parser.add_argument(
@@ -170,6 +217,31 @@ parser.add_argument(
     help="Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled",
     nargs="?"
 )
+# spike sorting
+parser.add_argument(
+    "spikesorting_raise_if_fails",
+    type=str,
+    help="Whether to raise an error in case of failure or continue. True means 'raise'",
+    nargs="?"
+)
+parser.add_argument(
+    "spikesorting_apply_motion",
+    type=str,
+    help="Whether to apply the sorter motion correction.",
+    nargs="?"
+)
+parser.add_argument(
+    "spikesorting_min_channels_motion",
+    type=str,
+    help="Minimum number of channels to enable motion correction",
+    nargs="?"
+)
+parser.add_argument(
+    "spikesorting_clear_cache",
+    type=str,
+    help="Whether to enable Kilosort4 clear cache.",
+    nargs="?"
+)
 # postprocessing
 parser.add_argument(
     "postprocessing_use_motion_corrected",
@@ -189,15 +261,27 @@ def main():
     args = parser.parse_args(parameters)
 
     pipeline_type = args.pipeline_type
+    if pipeline_type == "ecephys":
+        pipeline_type = "ecephys_ks25"
+    elif pipeline_type == "ecephys_opto":
+        pipeline_type = "ecephys_opto_ks25"
     assert (
         pipeline_type in valid_job_types
     ), f"job_type must be one of: {valid_job_types}"
+    result_suffix = args.result_suffix
+    if result_suffix == "":
+        result_suffix = None
+    output_bucket = args.output_bucket
+    if output_bucket == "":
+        output_bucket = None
     input_data_asset_id = args.input_data_asset_id
     job_dispatch_concatenate = args.job_dispatch_concatenate
+    job_dispatch_split_groups = args.job_dispatch_split_groups
     job_dispatch_input = args.job_dispatch_input
     nwb_backend = args.nwb_backend
     preprocessing_debug = args.preprocessing_debug
     preprocessing_denoising = args.preprocessing_denoising
+    preprocessing_filter_type = args.preprocessing_filter_type
     preprocessing_remove_out_channels = args.preprocessing_remove_out_channels
     preprocessing_remove_bad_channels = args.preprocessing_remove_bad_channels
     preprocessing_max_bad_channel_fraction = args.preprocessing_max_bad_channel_fraction
@@ -206,6 +290,10 @@ def main():
     preprocessing_t_start = args.preprocessing_t_start
     preprocessing_t_stop = args.preprocessing_t_stop
     preprocessing_debug_duration = args.preprocessing_debug_duration
+    spikesorting_raise_if_fails = args.spikesorting_raise_if_fails
+    spikesorting_apply_motion = args.spikesorting_apply_motion
+    spikesorting_min_channels_motion = args.spikesorting_min_channels_motion
+    spikesorting_clear_cache = args.spikesorting_clear_cache
     postprocessing_use_motion_corrected = args.postprocessing_use_motion_corrected
 
     # Loading environment variables
@@ -222,25 +310,21 @@ def main():
         domain=os.getenv("CODEOCEAN_DOMAIN"), token=os.getenv("API_SECRET")
     )
 
-    alert_bot_url = None
-    
+    alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
+    data_assets = construct_data_assets(
+        input_data_asset_id,
+        os.getenv("ECEPHYS_INPUT_MOUNT")
+    )
+
     # for each job type
-    if pipeline_type == "ecephys":
-        alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
-        data_assets = construct_data_assets(
-            input_data_asset_id,
-            os.getenv("ECEPHYS_INPUT_MOUNT")
-        )
-        job_config = EcephysJob()
-        job_config.process_config.request.data_assets = data_assets
-    elif pipeline_type == "ecephys_opto":
-        alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
-        data_assets = construct_data_assets(
-            input_data_asset_id,
-            os.getenv("ECEPHYS_OPTO_INPUT_MOUNT")
-        )
-        job_config = EcephysOptoJob()
-        job_config.process_config.request.data_assets = data_assets
+    if pipeline_type == "ecephys_ks25":
+        job_config = EcephysKS25Job()
+    elif pipeline_type == "ecephys_opto_ks25":
+        job_config = EcephysOptoKS25Job()
+    elif pipeline_type == "ecephys_ks4":
+        job_config = EcephysKS4Job()
+    elif pipeline_type == "ecephys_sc2":
+        job_config = EcephysSC2Job()
     else:
         logger.error(
             f"""
@@ -248,9 +332,22 @@ def main():
             Please enter a valid job_type among: {valid_job_types}.
             """
         )
+    job_config.process_config.request.data_assets = data_assets
+
+    if result_suffix is not None:
+        print(f"Setting result process name to: {result_suffix}")
+        job_config.capture_config.process_name = result_suffix
+
+    if output_bucket is not None:
+        print(f"Setting output bucket to: {output_bucket}")
+        job_config.capture_config.output_bucket = output_bucket
 
     # Update processes with parameters
-    job_dispatch_parameters = [job_dispatch_concatenate, job_dispatch_input]
+    job_dispatch_parameters = [
+        job_dispatch_concatenate,
+        job_dispatch_split_groups,
+        job_dispatch_input
+    ]
     job_dispatch_process = ComputationProcess(
         name=process_names[pipeline_type]["job_dispatch"],
         parameters=[str(p) for p in job_dispatch_parameters]
@@ -265,6 +362,7 @@ def main():
     preprocessing_parameters = [
         preprocessing_debug,
         preprocessing_denoising,
+        preprocessing_filter_type,
         preprocessing_remove_out_channels,
         preprocessing_remove_bad_channels,
         preprocessing_max_bad_channel_fraction,
@@ -279,13 +377,35 @@ def main():
         parameters=[str(p) for p in preprocessing_parameters]
     )
 
-    # TODO: postprocessing
+
+    spikesorting_parameters = [
+        spikesorting_raise_if_fails,
+        spikesorting_apply_motion,
+        spikesorting_min_channels_motion
+    ]
+    # ks4 accepts an additional clear_cache parameter
+    if "ks4" in pipeline_type:
+        spikesorting_parameters.append(spikesorting_clear_cache)
+    spikesorting_process = ComputationProcess(
+        name=process_names[pipeline_type]["spikesorting"],
+        parameters=[str(p) for p in spikesorting_parameters]
+    )
+
+    postprocessing_parameters = [postprocessing_use_motion_corrected]
+    postprocessing_process = ComputationProcess(
+        name=process_names[pipeline_type]["postprocessing"],
+        parameters=[str(p) for p in postprocessing_parameters]
+    )
 
     processes = [
         job_dispatch_process,
         nwb_subject_process,
-        preprocessing_process
+        preprocessing_process,
+        postprocessing_process
     ]
+
+    if spikesorting_process is not None:
+        processes.append(spikesorting_process)
 
     job_config.process_config.request.processes = processes
 
@@ -294,6 +414,10 @@ def main():
         alert_bot = AlertBot(alert_bot_url)
         data_asset_response = co_client.get_data_asset(input_data_asset_id)
         data_asset_json = data_asset_response.json()
+        if "name" not in data_asset_json:
+            raise RuntimeError(
+                "Could not fetch data asset. Maybe Code Ocean credentials are not properly set?"
+            )
         session_name = data_asset_json["name"]
     else:
         alert_bot = None
