@@ -18,9 +18,13 @@ from dotenv import load_dotenv
 
 from preconfigured_jobs import (
     EcephysKS25Job,
-    EcephysOptoKS25Job,
     EcephysKS4Job,
-    EcephysSC2Job
+    EcephysKS4MainJob,
+    EcephysKS4DevJob,
+    EcephysSC2Job,
+    EcephysKS25OptoJob,
+    EcephysKS4OptoJob,
+    EcephysKS25LegacyJob
 )
 
 LOG_FMT = "%(asctime)s %(message)s"
@@ -33,41 +37,47 @@ logger.setLevel(logging.INFO)
 
 valid_job_types = [
     "ecephys_ks25",
-    "ecephys_opto_ks25",
     "ecephys_ks4",
-    "ecephys_sc2"
+    "ecephys_ks4_main",
+    "ecephys_ks4_dev",
+    "ecephys_sc2",
+    "ecephys_ks25_opto",
+    "ecephys_ks4_opto",
+    "ecephys_sc2_opto",
+    "ecephys_ks25_v0.1.0",
+    "ecephys_ks25_v0_1_0",
 ]
 
-process_names = dict(
-    ecephys_ks25=dict(
-        job_dispatch="capsule_aind_ephys_job_dispatch_4",
-        nwb_subject="capsule_nwb_packaging_subject_capsule_10",
-        preprocessing="capsule_aind_ephys_preprocessing_1",
-        spikesorting="capsule_aind_ephys_spikesort_kilosort_25_7",
-        postprocessing="capsule_aind_ephys_postprocessing_5",
-    ),
-    ecephys_opto_ks25=dict(
-        job_dispatch="capsule_aind_ephys_job_dispatch_4",
-        nwb_subject="capsule_nwb_packaging_subject_capsule_10",
-        preprocessing="capsule_opto_preprocess_ecephys_1",
-        spikesorting="capsule_aind_ephys_spikesort_kilosort_25_7",
-        postprocessing="capsule_aind_ephys_postprocessing_5",
-    ),
-    ecephys_ks4=dict(
-        job_dispatch="capsule_job_dispatch_ecephys_1",
-        nwb_subject="capsule_nwb_packaging_subject_capsule_10",
-        preprocessing="capsule_preprocess_ecephys_2",
-        spikesorting="capsule_spikesort_ecephys_kilosort_4_analyzer_11",
-        postprocessing="capsule_postprocess_ecephys_4",
-    ),
-    ecephys_sc2=dict(
-        job_dispatch="capsule_job_dispatch_ecephys_1",
-        nwb_subject="capsule_nwb_packaging_subject_capsule_9",
-        preprocessing="capsule_preprocess_ecephys_2",
-        spikesorting="capsule_spikesort_spyking_circus_2_ecephys_3",
-        postprocessing="capsule_postprocess_ecephys_4",
-    ),
-)
+process_names = {
+    "job_dispatch": "capsule_aind_ephys_job_dispatch_4",
+    "nwb_subject": "capsule_nwb_packaging_subject_capsule_10",
+    "nwb_ecephys": "capsule_nwb_packaging_ecephys_capsule_12",
+    "preprocessing": "capsule_aind_ephys_preprocessing_1",
+    "postprocessing": "capsule_aind_ephys_postprocessing_5",
+    "collect_results": "capsule_aind_ephys_results_collector_9"
+}
+preprocessing_process_name = {
+    "ecephys_ks25": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks4": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks4_main": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks4_dev": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_sc2": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks25_v0.1.0": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks25_v0_1_0": "capsule_aind_ephys_preprocessing_1",
+    "ecephys_ks25_opto": "capsule_opto_preprocess_ecephys_1",
+    "ecephys_ks4_opto": "capsule_opto_preprocess_ecephys_1",
+    "ecephys_sc2_opto": "capsule_opto_preprocess_ecephys_1"
+}
+spikesorting_process_name = {
+    "ecephys_ks25": "capsule_aind_ephys_spikesort_kilosort_25_7",
+    "ecephys_ks4": "capsule_spikesort_kilosort_4_ecephys_7",
+    "ecephys_ks4_main": "capsule_spikesort_kilosort_4_ecephys_7",
+    "ecephys_ks4_dev": "capsule_spikesort_kilosort_4_ecephys_7",
+    "ecephys_sc2": "capsule_spikesort_spyking_circus_2_ecephys_7",
+    "ecephys_ks25_opto": "capsule_aind_ephys_spikesort_kilosort_25_7",
+    "ecephys_ks4_opto": "capsule_spikesort_kilosort_4_ecephys_7",
+    "ecephys_sc2_opto": "capsule_spikesort_spyking_circus_2_ecephys_7"
+}
 
 def construct_data_assets(input_id_str, mount_point_str):
     data_assets = []
@@ -96,7 +106,7 @@ parser.add_argument(
     "pipeline_type",
     type=str,
     help=(
-        "Pipeline to trigger, either 'ecephys_ks25' or 'ecephys_opto_ks25', 'ecephys_ks4', or 'ecephys_sc2'."
+        f"Pipeline to trigger: {valid_job_types}"
     ),
 )
 parser.add_argument(
@@ -126,13 +136,31 @@ parser.add_argument(
 
 # job dispatch
 parser.add_argument(
-    "job_dispatch_concatenate",
+    "job_dispatch_split_segments",
     type=str,
     help="",
     nargs="?",
 )
 parser.add_argument(
     "job_dispatch_split_groups",
+    type=str,
+    help="",
+    nargs="?",
+)
+parser.add_argument(
+    "job_dispatch_debug",
+    type=str,
+    help="Whether to run in DEBUG mode",
+    nargs="?"
+)
+parser.add_argument(
+    "job_dispatch_debug_duration",
+    type=int,
+    help="Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled",
+    nargs="?"
+)
+parser.add_argument(
+    "job_dispatch_skip_timestamps_check",
     type=str,
     help="",
     nargs="?",
@@ -151,12 +179,6 @@ parser.add_argument(
     nargs="?"
 )
 # preprocessing
-parser.add_argument(
-    "preprocessing_debug",
-    type=str,
-    help="Whether to run in DEBUG mode",
-    nargs="?"
-)
 parser.add_argument(
     "preprocessing_denoising",
     type=str,
@@ -200,6 +222,12 @@ parser.add_argument(
     nargs="?"
 )
 parser.add_argument(
+    "preprocessing_motion_temporal_bin_s",
+    type=float,
+    help="Temporal bin size in seconds for motion estimation",
+    nargs="?"
+)
+parser.add_argument(
     "preprocessing_t_start",
     type=str,
     help="Start time of clipped recording. Default is None",
@@ -212,9 +240,9 @@ parser.add_argument(
     nargs="?"
 )
 parser.add_argument(
-    "preprocessing_debug_duration",
-    type=int,
-    help="Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled",
+    "preprocessing_min_duration",
+    type=str,
+    help="Min duration for preprocessing. Default is 120",
     nargs="?"
 )
 # spike sorting
@@ -225,7 +253,7 @@ parser.add_argument(
     nargs="?"
 )
 parser.add_argument(
-    "spikesorting_apply_motion",
+    "spikesorting_skip_motion",
     type=str,
     help="Whether to apply the sorter motion correction.",
     nargs="?"
@@ -275,11 +303,13 @@ def main():
     if output_bucket == "":
         output_bucket = None
     input_data_asset_id = args.input_data_asset_id
-    job_dispatch_concatenate = args.job_dispatch_concatenate
+    job_dispatch_split_segments = args.job_dispatch_split_segments
     job_dispatch_split_groups = args.job_dispatch_split_groups
+    job_dispatch_debug = args.job_dispatch_debug
+    job_dispatch_debug_duration = args.job_dispatch_debug_duration
+    job_dispatch_skip_timestamps_check = args.job_dispatch_skip_timestamps_check
     job_dispatch_input = args.job_dispatch_input
     nwb_backend = args.nwb_backend
-    preprocessing_debug = args.preprocessing_debug
     preprocessing_denoising = args.preprocessing_denoising
     preprocessing_filter_type = args.preprocessing_filter_type
     preprocessing_remove_out_channels = args.preprocessing_remove_out_channels
@@ -287,11 +317,12 @@ def main():
     preprocessing_max_bad_channel_fraction = args.preprocessing_max_bad_channel_fraction
     preprocessing_motion = args.preprocessing_motion
     preprocessing_motion_preset = args.preprocessing_motion_preset
+    preprocessing_motion_temporal_bin_s = args.preprocessing_motion_temporal_bin_s
     preprocessing_t_start = args.preprocessing_t_start
     preprocessing_t_stop = args.preprocessing_t_stop
-    preprocessing_debug_duration = args.preprocessing_debug_duration
+    preprocessing_min_duration = args.preprocessing_min_duration
     spikesorting_raise_if_fails = args.spikesorting_raise_if_fails
-    spikesorting_apply_motion = args.spikesorting_apply_motion
+    spikesorting_skip_motion = args.spikesorting_skip_motion
     spikesorting_min_channels_motion = args.spikesorting_min_channels_motion
     spikesorting_clear_cache = args.spikesorting_clear_cache
     postprocessing_use_motion_corrected = args.postprocessing_use_motion_corrected
@@ -319,19 +350,30 @@ def main():
     # for each job type
     if pipeline_type == "ecephys_ks25":
         job_config = EcephysKS25Job()
-    elif pipeline_type == "ecephys_opto_ks25":
-        job_config = EcephysOptoKS25Job()
+    elif pipeline_type == "ecephys_ks25_opto":
+        job_config = EcephysKS25OptoJob()
     elif pipeline_type == "ecephys_ks4":
         job_config = EcephysKS4Job()
+    elif pipeline_type == "ecephys_ks4_main":
+        job_config = EcephysKS4MainJob()
+    elif pipeline_type == "ecephys_ks4_dev":
+        job_config = EcephysKS4DevJob()
+    elif pipeline_type == "ecephys_ks4_opto":
+        job_config = EcephysKS4OptoJob()
     elif pipeline_type == "ecephys_sc2":
         job_config = EcephysSC2Job()
+    elif pipeline_type == "ecephys_sc2_opto":
+        job_config = EcephysSC2OptoJob()
+    elif pipeline_type == "ecephys_ks25_v0.1.0" or pipeline_type == "ecephys_ks25_v0_1_0":
+        pipeline_type = "ecephys_ks25_v0.1.0"
+        job_config = EcephysKS25LegacyJob()
     else:
         logger.error(
-            f"""
-            Pipeline job_type {pipeline_type} not recognized. 
-            Please enter a valid job_type among: {valid_job_types}.
-            """
+            f"Pipeline job_type {pipeline_type} not recognized. "
+            f"Please enter a valid job_type among: {valid_job_types}."
+            
         )
+        raise ValueError("Pipeline type not recognized")
     job_config.process_config.request.data_assets = data_assets
 
     if result_suffix is not None:
@@ -343,66 +385,127 @@ def main():
         job_config.capture_config.output_bucket = output_bucket
 
     # Update processes with parameters
+    if pipeline_type == "ecephys_ks25_v0.1.0":
+        # for previous versions, the parameter was 'concatenate' instead of 'split-segments'
+        if job_dispatch_split_segments == "true":
+            job_dispatch_split_segments = "false"
+        else:
+            job_dispatch_split_segments = "true"
     job_dispatch_parameters = [
-        job_dispatch_concatenate,
-        job_dispatch_split_groups,
-        job_dispatch_input
+        job_dispatch_split_segments,
+        job_dispatch_split_groups
     ]
+    if pipeline_type == "ecephys_ks25_v0.1.0":
+        job_dispatch_parameters.append(job_dispatch_input)
+    else:
+        job_dispatch_parameters.extend(
+            [
+                job_dispatch_debug,
+                job_dispatch_debug_duration,
+                job_dispatch_skip_timestamps_check,
+                job_dispatch_input
+            ]
+        )
+    print(job_dispatch_parameters)
+
     job_dispatch_process = ComputationProcess(
-        name=process_names[pipeline_type]["job_dispatch"],
+        name=process_names["job_dispatch"],
         parameters=[str(p) for p in job_dispatch_parameters]
     )
 
-    nwb_subject_parameters = [nwb_backend]
-    nwb_subject_process = ComputationProcess(
-        name=process_names[pipeline_type]["nwb_subject"],
-        parameters=[str(p) for p in nwb_subject_parameters]
+    nwb_parameters = [nwb_backend]
+    if pipeline_type != "ecephys_ks25_v0.1.0":
+        backend_process = "nwb_ecephys"
+    else:
+        backend_process = "nwb_subject"
+    nwb_backend_process = ComputationProcess(
+        name=process_names[backend_process],
+        parameters=[str(p) for p in nwb_parameters]
     )
 
-    preprocessing_parameters = [
-        preprocessing_debug,
-        preprocessing_denoising,
-        preprocessing_filter_type,
-        preprocessing_remove_out_channels,
-        preprocessing_remove_bad_channels,
-        preprocessing_max_bad_channel_fraction,
-        preprocessing_motion,
-        preprocessing_motion_preset,
-        preprocessing_t_start,
-        preprocessing_t_stop,
-        preprocessing_debug_duration
-    ]
+    if pipeline_type == "ecephys_ks25_v0.1.0":
+        # dredge was not supported
+        if preprocessing_motion_preset == "dredge":
+            preprocessing_motion_preset = "nonrigid_accurate"
+        elif preprocessing_motion_preset == "dredge_fast":
+            preprocessing_motion_preset = "nonrigid_fast_and_accurate"
+        preprocessing_parameters = [job_dispatch_debug]
+    else:
+        preprocessing_parameters = []
+    preprocessing_parameters.extend(
+        [
+            preprocessing_denoising,
+            preprocessing_filter_type,
+            preprocessing_remove_out_channels,
+            preprocessing_remove_bad_channels,
+            preprocessing_max_bad_channel_fraction,
+            preprocessing_motion,
+            preprocessing_motion_preset
+        ]
+    )
+    if pipeline_type != "ecephys_ks25_v0.1.0":
+        preprocessing_parameters.extend(
+            [
+                preprocessing_motion_temporal_bin_s,
+                preprocessing_t_start,
+                preprocessing_t_stop,
+            ]
+        )
+    else:
+        preprocessing_parameters.extend(
+            [
+                preprocessing_t_start,
+                preprocessing_t_stop,
+            ]
+        )
+    if pipeline_type == "ecephys_ks25_v0.1.0":
+        preprocessing_parameters.append(job_dispatch_debug_duration)
+    else:
+        preprocessing_parameters.append(preprocessing_min_duration)
+
     preprocessing_process = ComputationProcess(
-        name=process_names[pipeline_type]["preprocessing"],
+        name=preprocessing_process_name[pipeline_type],
         parameters=[str(p) for p in preprocessing_parameters]
     )
 
-
     spikesorting_parameters = [
         spikesorting_raise_if_fails,
-        spikesorting_apply_motion,
+        spikesorting_skip_motion,
         spikesorting_min_channels_motion
     ]
     # ks4 accepts an additional clear_cache parameter
     if "ks4" in pipeline_type:
         spikesorting_parameters.append(spikesorting_clear_cache)
-    spikesorting_process = ComputationProcess(
-        name=process_names[pipeline_type]["spikesorting"],
-        parameters=[str(p) for p in spikesorting_parameters]
-    )
+    if pipeline_type != "ecephys_ks25_v0.1.0":
+        spikesorting_process = ComputationProcess(
+            name=spikesorting_process_name[pipeline_type],
+            parameters=[str(p) for p in spikesorting_parameters]
+        )
+    else:
+        spikesorting_process = None
 
     postprocessing_parameters = [postprocessing_use_motion_corrected]
     postprocessing_process = ComputationProcess(
-        name=process_names[pipeline_type]["postprocessing"],
+        name=process_names["postprocessing"],
         parameters=[str(p) for p in postprocessing_parameters]
+    )
+
+    collect_results_parameters = [result_suffix]
+    collect_results_process = ComputationProcess(
+        name=process_names["collect_results"],
+        parameters=[str(p) for p in collect_results_parameters]
     )
 
     processes = [
         job_dispatch_process,
-        nwb_subject_process,
+        nwb_backend_process,
         preprocessing_process,
-        postprocessing_process
+        collect_results_process
     ]
+
+    # For the KS4 pipeline, app panel for postprocessing is disabled for shared-mem issues
+    if pipeline_type != "ecephys_ks25_v0.1.0":
+        processes.append(postprocessing_process)
 
     if spikesorting_process is not None:
         processes.append(spikesorting_process)
@@ -431,12 +534,12 @@ def main():
         co_client=co_client, job_config=job_config
     )
     if alert_bot:
-        alert_bot.send_message(f"Starting {session_name}")
+        alert_bot.send_message(f"Starting pipeline {pipeline_type} for {session_name}")
     # run the job
     try:
         codeocean_job.run_job()
         if alert_bot:
-            alert_bot.send_message(message=f"Finished {session_name}")
+            alert_bot.send_message(message=f"Finished pipeline {pipeline_type} for {session_name}")
     except Exception as e:
         if alert_bot:
             alert_bot.send_message(
