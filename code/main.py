@@ -16,16 +16,7 @@ from aind_codeocean_utils.codeocean_job import CodeOceanJob
 from aind_codeocean_utils.alert_bot import AlertBot
 from dotenv import load_dotenv
 
-from preconfigured_jobs import (
-    EcephysKS25Job,
-    EcephysKS4Job,
-    EcephysKS4MainJob,
-    EcephysKS4DevJob,
-    EcephysSC2Job,
-    EcephysKS25OptoJob,
-    EcephysKS4OptoJob,
-    EcephysKS25LegacyJob
-)
+from job_config_models import get_job_config
 
 LOG_FMT = "%(asctime)s %(message)s"
 LOG_DATE_FMT = "%Y-%m-%d %H:%M"
@@ -35,49 +26,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-valid_job_types = [
-    "ecephys_ks25",
-    "ecephys_ks4",
-    "ecephys_ks4_main",
-    "ecephys_ks4_dev",
-    "ecephys_sc2",
-    "ecephys_ks25_opto",
-    "ecephys_ks4_opto",
-    "ecephys_sc2_opto",
-    "ecephys_ks25_v0.1.0",
-    "ecephys_ks25_v0_1_0",
-]
-
-process_names = {
-    "job_dispatch": "capsule_aind_ephys_job_dispatch_4",
-    "nwb_subject": "capsule_nwb_packaging_subject_capsule_10",
-    "nwb_ecephys": "capsule_nwb_packaging_ecephys_capsule_12",
-    "preprocessing": "capsule_aind_ephys_preprocessing_1",
-    "postprocessing": "capsule_aind_ephys_postprocessing_5",
-    "collect_results": "capsule_aind_ephys_results_collector_9"
-}
-preprocessing_process_name = {
-    "ecephys_ks25": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks4": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks4_main": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks4_dev": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_sc2": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks25_v0.1.0": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks25_v0_1_0": "capsule_aind_ephys_preprocessing_1",
-    "ecephys_ks25_opto": "capsule_opto_preprocess_ecephys_1",
-    "ecephys_ks4_opto": "capsule_opto_preprocess_ecephys_1",
-    "ecephys_sc2_opto": "capsule_opto_preprocess_ecephys_1"
-}
-spikesorting_process_name = {
-    "ecephys_ks25": "capsule_aind_ephys_spikesort_kilosort_25_7",
-    "ecephys_ks4": "capsule_spikesort_kilosort_4_ecephys_7",
-    "ecephys_ks4_main": "capsule_spikesort_kilosort_4_ecephys_7",
-    "ecephys_ks4_dev": "capsule_spikesort_kilosort_4_ecephys_7",
-    "ecephys_sc2": "capsule_spikesort_spyking_circus_2_ecephys_7",
-    "ecephys_ks25_opto": "capsule_aind_ephys_spikesort_kilosort_25_7",
-    "ecephys_ks4_opto": "capsule_spikesort_kilosort_4_ecephys_7",
-    "ecephys_sc2_opto": "capsule_spikesort_spyking_circus_2_ecephys_7"
-}
 
 def construct_data_assets(input_id_str, mount_point_str):
     data_assets = []
@@ -105,9 +53,7 @@ parser = argparse.ArgumentParser(description="Trigger codeocean job")
 parser.add_argument(
     "pipeline_type",
     type=str,
-    help=(
-        f"Pipeline to trigger: {valid_job_types}"
-    ),
+    help="Pipeline to trigger (see job_configs.json for available types)",
 )
 parser.add_argument(
     "input_data_asset_id",
@@ -284,22 +230,16 @@ def main():
     """
     Main function to execute pipelines
     """
-    # TODO: Add module to CodeOceanClient to parse configs.
+
     parameters = sys.argv[1:]
     args = parser.parse_args(parameters)
 
-    pipeline_type = args.pipeline_type
-    if pipeline_type == "ecephys":
-        pipeline_type = "ecephys_ks25"
-    elif pipeline_type == "ecephys_opto":
-        pipeline_type = "ecephys_opto_ks25"
-    assert (
-        pipeline_type in valid_job_types
-    ), f"job_type must be one of: {valid_job_types}"
-    result_suffix = args.result_suffix
+    job_config = get_job_config(args.pipeline_type)
+
+    result_suffix: Optional[str] = args.result_suffix
     if result_suffix == "":
         result_suffix = None
-    output_bucket = args.output_bucket
+    output_bucket: Optional[str] = args.output_bucket
     if output_bucket == "":
         output_bucket = None
     input_data_asset_id = args.input_data_asset_id
@@ -343,49 +283,14 @@ def main():
 
     alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
     data_assets = construct_data_assets(
-        input_data_asset_id,
-        os.getenv("ECEPHYS_INPUT_MOUNT")
+        input_data_asset_id=input_data_asset_id,
+        input_data_mount=job_config.input_data_mount,
     )
-
-    # for each job type
-    if pipeline_type == "ecephys_ks25":
-        job_config = EcephysKS25Job()
-    elif pipeline_type == "ecephys_ks25_opto":
-        job_config = EcephysKS25OptoJob()
-    elif pipeline_type == "ecephys_ks4":
-        job_config = EcephysKS4Job()
-    elif pipeline_type == "ecephys_ks4_main":
-        job_config = EcephysKS4MainJob()
-    elif pipeline_type == "ecephys_ks4_dev":
-        job_config = EcephysKS4DevJob()
-    elif pipeline_type == "ecephys_ks4_opto":
-        job_config = EcephysKS4OptoJob()
-    elif pipeline_type == "ecephys_sc2":
-        job_config = EcephysSC2Job()
-    elif pipeline_type == "ecephys_sc2_opto":
-        job_config = EcephysSC2OptoJob()
-    elif pipeline_type == "ecephys_ks25_v0.1.0" or pipeline_type == "ecephys_ks25_v0_1_0":
-        pipeline_type = "ecephys_ks25_v0.1.0"
-        job_config = EcephysKS25LegacyJob()
-    else:
-        logger.error(
-            f"Pipeline job_type {pipeline_type} not recognized. "
-            f"Please enter a valid job_type among: {valid_job_types}."
-            
-        )
-        raise ValueError("Pipeline type not recognized")
-    job_config.process_config.request.data_assets = data_assets
-
-    if result_suffix is not None:
-        print(f"Setting result process name to: {result_suffix}")
-        job_config.capture_config.process_name = result_suffix
-
-    if output_bucket is not None:
-        print(f"Setting output bucket to: {output_bucket}")
-        job_config.capture_config.output_bucket = output_bucket
+    if not data_assets:
+        logger.warning("No data assets will be attached. If that's unintended, please provide input_data_asset_id and input_data_mount.")
 
     # Update processes with parameters
-    if pipeline_type == "ecephys_ks25_v0.1.0":
+    if job_config.name == "ecephys_ks25_v0.1.0":
         # for previous versions, the parameter was 'concatenate' instead of 'split-segments'
         if job_dispatch_split_segments == "true":
             job_dispatch_split_segments = "false"
@@ -395,7 +300,7 @@ def main():
         job_dispatch_split_segments,
         job_dispatch_split_groups
     ]
-    if pipeline_type == "ecephys_ks25_v0.1.0":
+    if job_config.name == "ecephys_ks25_v0.1.0":
         job_dispatch_parameters.append(job_dispatch_input)
     else:
         job_dispatch_parameters.extend(
@@ -409,21 +314,21 @@ def main():
     print(job_dispatch_parameters)
 
     job_dispatch_process = ComputationProcess(
-        name=process_names["job_dispatch"],
+        name=job_config.process_names.job_dispatch,
         parameters=[str(p) for p in job_dispatch_parameters]
     )
 
     nwb_parameters = [nwb_backend]
-    if pipeline_type != "ecephys_ks25_v0.1.0":
+    if job_config.name != "ecephys_ks25_v0.1.0":
         backend_process = "nwb_ecephys"
     else:
         backend_process = "nwb_subject"
     nwb_backend_process = ComputationProcess(
-        name=process_names[backend_process],
+        name=job_config.process_names[backend_process],
         parameters=[str(p) for p in nwb_parameters]
     )
 
-    if pipeline_type == "ecephys_ks25_v0.1.0":
+    if job_config.name == "ecephys_ks25_v0.1.0":
         # dredge was not supported
         if preprocessing_motion_preset == "dredge":
             preprocessing_motion_preset = "nonrigid_accurate"
@@ -443,7 +348,7 @@ def main():
             preprocessing_motion_preset
         ]
     )
-    if pipeline_type != "ecephys_ks25_v0.1.0":
+    if job_config.name != "ecephys_ks25_v0.1.0":
         preprocessing_parameters.extend(
             [
                 preprocessing_motion_temporal_bin_s,
@@ -458,13 +363,13 @@ def main():
                 preprocessing_t_stop,
             ]
         )
-    if pipeline_type == "ecephys_ks25_v0.1.0":
+    if job_config.name == "ecephys_ks25_v0.1.0":
         preprocessing_parameters.append(job_dispatch_debug_duration)
     else:
         preprocessing_parameters.append(preprocessing_min_duration)
 
     preprocessing_process = ComputationProcess(
-        name=preprocessing_process_name[pipeline_type],
+        name=job_config.process_names.preprocessing,
         parameters=[str(p) for p in preprocessing_parameters]
     )
 
@@ -474,11 +379,11 @@ def main():
         spikesorting_min_channels_motion
     ]
     # ks4 accepts an additional clear_cache parameter
-    if "ks4" in pipeline_type:
+    if "ks4" in job_config.name:
         spikesorting_parameters.append(spikesorting_clear_cache)
-    if pipeline_type != "ecephys_ks25_v0.1.0":
+    if job_config.name != "ecephys_ks25_v0.1.0":
         spikesorting_process = ComputationProcess(
-            name=spikesorting_process_name[pipeline_type],
+            name=job_config.process_names.spikesorting,
             parameters=[str(p) for p in spikesorting_parameters]
         )
     else:
@@ -486,13 +391,13 @@ def main():
 
     postprocessing_parameters = [postprocessing_use_motion_corrected]
     postprocessing_process = ComputationProcess(
-        name=process_names["postprocessing"],
+        name=job_config.process_names.postprocessing,
         parameters=[str(p) for p in postprocessing_parameters]
     )
 
     collect_results_parameters = [result_suffix]
     collect_results_process = ComputationProcess(
-        name=process_names["collect_results"],
+        name=job_config.process_names.collect_results,
         parameters=[str(p) for p in collect_results_parameters]
     )
 
@@ -504,7 +409,7 @@ def main():
     ]
 
     # For the KS4 pipeline, app panel for postprocessing is disabled for shared-mem issues
-    if pipeline_type != "ecephys_ks25_v0.1.0":
+    if job_config.name != "ecephys_ks25_v0.1.0":
         processes.append(postprocessing_process)
 
     if spikesorting_process is not None:
@@ -534,12 +439,12 @@ def main():
         co_client=co_client, job_config=job_config
     )
     if alert_bot:
-        alert_bot.send_message(f"Starting pipeline {pipeline_type} for {session_name}")
+        alert_bot.send_message(f"Starting pipeline {job_config.name} for {session_name}")
     # run the job
     try:
         codeocean_job.run_job()
         if alert_bot:
-            alert_bot.send_message(message=f"Finished pipeline {pipeline_type} for {session_name}")
+            alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {session_name}")
     except Exception as e:
         if alert_bot:
             alert_bot.send_message(
