@@ -459,6 +459,20 @@ def main():
         if alert_bot:
             alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {input_data_asset_info.name}")
     
+    completed_computation = co_client.computations.wait_until_completed(computation=computation, polling_interval=300, timeout=7 * 24 * 3600)
+    
+    logger.info(f"Sorting finished: {completed_computation.end_status}")
+    assert completed_computation.id == computation.id, f"Completed computation ID {completed_computation.id!r} does not match the original computation ID {computation.id!r}: something wrong with computation wait code or codeocean API has changed"
+    
+    if not completed_computation.end_status == ComputationEndStatus.Succeeded:
+        logger.error(f"Computation ended with status {completed_computation.end_status}, not 'succeeded'. Not capturing result.")
+        if alert_bot:
+            logger.info("Sending alert")
+            alert_bot.send_message(
+                message=f"Computation for {input_data_asset_info.name} ended with status {completed_computation.end_status}, not 'succeeded'. Result not captured."
+            )
+        exit(1)
+        
     logger.info("Preparing data asset capture parameters")
     captured_asset_name = f"{input_data_asset_info.name}_{job_config.captured_asset_label}_{datetime.datetime.now().isoformat(sep='_', timespec='seconds').replace(':', '-')}"
     platform, subject_id = input_data_asset_info.name.split("_")[:2]
@@ -479,21 +493,7 @@ def main():
         },
         source=source,
     )
-    print(f"Waiting for sorting to finish, then capturing result as a data asset with params:\n{asset_capture_params.to_dict()}")
-    
-    completed_computation = co_client.computations.wait_until_completed(computation=computation, polling_interval=300, timeout=7 * 24 * 3600)
-    
-    logger.info(f"Sorting finished: {completed_computation.end_status}")
-    if not completed_computation.end_status == ComputationEndStatus.Succeeded:
-        logger.error(f"Computation ended with status {completed_computation.end_status}, not 'succeeded'. Not capturing result.")
-        if alert_bot:
-            logger.info("Sending alert")
-            alert_bot.send_message(
-                message=f"Computation for {input_data_asset_info.name} ended with status {completed_computation.end_status}, not 'succeeded'. Result not captured."
-            )
-        exit(1)
-    
-    assert completed_computation.id == computation.id, f"Completed computation ID {completed_computation.id!r} does not match the original computation ID {computation.id!r}: something wrong with computation wait code or codeocean API has changed"
+    print(f"Capturing result as a data asset with params:\n{asset_capture_params.to_dict()}")
     
     logger.info("Capturing result as sorted data asset")
     captured_asset = co_client.data_assets.create_data_asset(data_asset_params=asset_capture_params)
