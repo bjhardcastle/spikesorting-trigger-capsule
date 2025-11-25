@@ -271,28 +271,9 @@ def main():
     spikesorting_clear_cache = args.spikesorting_clear_cache
     postprocessing_use_motion_corrected = args.postprocessing_use_motion_corrected
 
-    # Loading environment variables
-    dotenv_path = Path(os.path.dirname(os.path.realpath(__file__))) / ".env"
-    load_env_file = load_dotenv(dotenv_path=dotenv_path)
-    logger.info(f"Load env file status: {load_env_file}")
-
-    if not load_env_file:
-        logger.error(f"Error loading env file in path {dotenv_path}")
-        exit(1)
-
-    # Create a code ocean client that can execute api calls
-    co_client = CodeOceanClient(
-        domain=os.environ["CODEOCEAN_DOMAIN"], token=os.environ["API_SECRET"], retries=3,
-    )
-
     if ";" in input_data_asset_id:
         raise NotImplementedError("Attempted to process multiple data assets. This is no longer supported.")
-    
-    input_data_asset_params = DataAssetsRunParam(
-        id=input_data_asset_id,
-        mount=job_config.input_data_mount,
-    )
-    
+
     # Update processes with parameters
     if job_config.name == "ecephys_ks25_v0.1.0":
         # for previous versions, the parameter was 'concatenate' instead of 'split-segments'
@@ -419,13 +400,34 @@ def main():
     if spikesorting_process is not None:
         processes.append(spikesorting_process)
         
+    # Load environment variables to create client
+    dotenv_path = Path(os.path.dirname(os.path.realpath(__file__))) / ".env"
+    load_env_file = load_dotenv(dotenv_path=dotenv_path)
+    logger.info(f"Load env file status: {load_env_file}")
+
+    if not load_env_file:
+        logger.error(f"Error loading env file from {dotenv_path}")
+        exit(1)
+
+    # Create a code ocean client that can execute api calls
+    co_client = CodeOceanClient(
+        domain=os.environ["CODEOCEAN_DOMAIN"], token=os.environ["API_SECRET"], retries=3,
+    )
     input_data_asset_info = co_client.data_assets.get_data_asset(input_data_asset_id)
+
 
     alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
     if alert_bot_url:
+        logger.info("Creating alert bot")
         alert_bot = AlertBot(alert_bot_url)
     else:
         alert_bot = None
+
+    logger.info("Fetching input data asset info")
+    input_data_asset_params = DataAssetsRunParam(
+        id=input_data_asset_id,
+        mount=job_config.input_data_mount,
+    )
 
     run_params = RunParams(
         pipeline_id=job_config.pipeline_id,
