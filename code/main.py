@@ -3,18 +3,18 @@ Main file to execute code ocean jobs
 """
 
 import argparse
+import datetime
 import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
-from aind_codeocean_api.codeocean import CodeOceanClient
-from aind_codeocean_api.models.computations_requests import (
-    ComputationProcess
-)
-from aind_codeocean_utils.codeocean_job import CodeOceanJob
 from aind_codeocean_utils.alert_bot import AlertBot
 from dotenv import load_dotenv
+from codeocean.client import CodeOcean as CodeOceanClient
+from codeocean.computation import RunParams, DataAssetsRunParam, PipelineProcessParams
+from codeocean.data_asset import DataAssetParams, ComputationSource, Source, Permissions
 
 from job_config_models import get_job_config
 
@@ -27,19 +27,23 @@ logger.setLevel(logging.INFO)
 
 
 
-def construct_data_assets(input_id_str, mount_point_str):
-    data_assets = []
-    if input_id_str is None:
+def construct_data_assets(input_data_asset_id: Optional[str], input_data_mount: Optional[str]):
+    data_assets: list[DataAssetsRunParam] = []
+    if input_data_asset_id is None:
         return data_assets
-    assert mount_point_str is not None, (
-        "If input_data_asset_id is provided, input_data_mount "
-        "should also be provided to attach the data assets."
-    )
-    input_ids = input_id_str.split(";")
-    mounts = mount_point_str.split(";")
+    if input_data_mount is None:
+        raise ValueError(
+            "If input_data_asset_id is provided, input_data_mount must also be provided to attach the data assets."
+        )
+    input_ids = input_data_asset_id.split(";")
+    mounts = input_data_mount.split(";")
+    if len(input_ids) != len(mounts):
+        raise ValueError(
+            f"The number of input_data_asset_id and input_data_mount entries must be the same. Got: {input_ids!r} and {mounts!r}"
+        )
     for input_id, mount in zip(input_ids, mounts):
         data_assets.append(
-            dict(
+            DataAssetsRunParam(
                 id=input_id,
                 mount=mount,
             )
@@ -242,7 +246,7 @@ def main():
     output_bucket: Optional[str] = args.output_bucket
     if output_bucket == "":
         output_bucket = None
-    input_data_asset_id = args.input_data_asset_id
+    input_data_asset_id: str = args.input_data_asset_id
     job_dispatch_split_segments = args.job_dispatch_split_segments
     job_dispatch_split_groups = args.job_dispatch_split_groups
     job_dispatch_debug = args.job_dispatch_debug
@@ -278,17 +282,17 @@ def main():
 
     # Create a code ocean client that can execute api calls
     co_client = CodeOceanClient(
-        domain=os.getenv("CODEOCEAN_DOMAIN"), token=os.getenv("API_SECRET")
+        domain=os.environ["CODEOCEAN_DOMAIN"], token=os.environ["API_SECRET"], retries=3,
     )
 
-    alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
-    data_assets = construct_data_assets(
-        input_data_asset_id=input_data_asset_id,
-        input_data_mount=job_config.input_data_mount,
+    if ";" in input_data_asset_id:
+        raise NotImplementedError("Attempted to process multiple data assets. This is no longer supported.")
+    
+    input_data_asset_params = DataAssetsRunParam(
+        id=input_data_asset_id,
+        mount=job_config.input_data_mount,
     )
-    if not data_assets:
-        logger.warning("No data assets will be attached. If that's unintended, please provide input_data_asset_id and input_data_mount.")
-
+    
     # Update processes with parameters
     if job_config.name == "ecephys_ks25_v0.1.0":
         # for previous versions, the parameter was 'concatenate' instead of 'split-segments'
@@ -313,7 +317,7 @@ def main():
         )
     print(job_dispatch_parameters)
 
-    job_dispatch_process = ComputationProcess(
+    job_dispatch_process = PipelineProcessParams(
         name=job_config.process_names.job_dispatch,
         parameters=[str(p) for p in job_dispatch_parameters]
     )
@@ -323,7 +327,7 @@ def main():
         backend_process = "nwb_ecephys"
     else:
         backend_process = "nwb_subject"
-    nwb_backend_process = ComputationProcess(
+    nwb_backend_process = PipelineProcessParams(
         name=job_config.process_names[backend_process],
         parameters=[str(p) for p in nwb_parameters]
     )
@@ -368,7 +372,7 @@ def main():
     else:
         preprocessing_parameters.append(preprocessing_min_duration)
 
-    preprocessing_process = ComputationProcess(
+    preprocessing_process = PipelineProcessParams(
         name=job_config.process_names.preprocessing,
         parameters=[str(p) for p in preprocessing_parameters]
     )
@@ -382,7 +386,7 @@ def main():
     if "ks4" in job_config.name:
         spikesorting_parameters.append(spikesorting_clear_cache)
     if job_config.name != "ecephys_ks25_v0.1.0":
-        spikesorting_process = ComputationProcess(
+        spikesorting_process = PipelineProcessParams(
             name=job_config.process_names.spikesorting,
             parameters=[str(p) for p in spikesorting_parameters]
         )
@@ -390,13 +394,13 @@ def main():
         spikesorting_process = None
 
     postprocessing_parameters = [postprocessing_use_motion_corrected]
-    postprocessing_process = ComputationProcess(
+    postprocessing_process = PipelineProcessParams(
         name=job_config.process_names.postprocessing,
         parameters=[str(p) for p in postprocessing_parameters]
     )
 
     collect_results_parameters = [result_suffix]
-    collect_results_process = ComputationProcess(
+    collect_results_process = PipelineProcessParams(
         name=job_config.process_names.collect_results,
         parameters=[str(p) for p in collect_results_parameters]
     )
@@ -414,44 +418,72 @@ def main():
 
     if spikesorting_process is not None:
         processes.append(spikesorting_process)
+        
+    input_data_asset_info = co_client.data_assets.get_data_asset(input_data_asset_id)
 
-    job_config.process_config.request.processes = processes
-
-
+    alert_bot_url = os.getenv("ECEPHYS_ALERT_BOT_URL")
     if alert_bot_url:
         alert_bot = AlertBot(alert_bot_url)
-        data_asset_response = co_client.get_data_asset(input_data_asset_id)
-        data_asset_json = data_asset_response.json()
-        if "name" not in data_asset_json:
-            raise RuntimeError(
-                "Could not fetch data asset. Maybe Code Ocean credentials are not properly set?"
-            )
-        session_name = data_asset_json["name"]
     else:
         alert_bot = None
 
-    print(f"Register config:\n{job_config.register_config}")
-    print(f"Process config:\n{job_config.process_config}")
-    print(f"Capture config:\n{job_config.capture_config}")
-
-
-    codeocean_job = CodeOceanJob(
-        co_client=co_client, job_config=job_config
+    run_params = RunParams(
+        pipeline_id=job_config.pipeline_id,
+        version=job_config.version,
+        data_assets=[input_data_asset_params],
+        processes=processes,
     )
+    print(f"Pipeleine run params:\n{run_params.to_dict()}")
+
+
+    logger.info(f"Starting pipeline for {input_data_asset_info.name}")
     if alert_bot:
-        alert_bot.send_message(f"Starting pipeline {job_config.name} for {session_name}")
+        logger.info("Sending alert")
+        alert_bot.send_message(f"Starting pipeline {job_config.name} for {input_data_asset_info.name}")
     # run the job
     try:
-        codeocean_job.run_job()
-        if alert_bot:
-            alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {session_name}")
+        computation = co_client.computations.run_capsule(run_params)
     except Exception as e:
         if alert_bot:
             alert_bot.send_message(
-                message=f"Error with {session_name}", extra_text=str(e)
+                message=f"Error with {input_data_asset_info.name}", extra_text=str(e)
             )
         raise e
+    else:
+        if alert_bot:
+            alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {input_data_asset_info.name}")
+    
+    captured_asset_name = f"{input_data_asset_info.name}_{job_config.captured_asset_label}_{datetime.datetime.now().isoformat(sep='_', timespec='seconds')}"
+    platform, subject_id = input_data_asset_info.name.split("_")[:2]
+    asset_capture_params = DataAssetParams(
+        name=captured_asset_name,
+        tags=["derived", platform, subject_id],
+        mount=captured_asset_name,
+        custom_metadata={
+            "data level": "derived",
+            "experiment type": platform,
+            "subject id": subject_id,
+        },
+        source=Source(computation=ComputationSource(id=computation.id))
+    )
+    print(f"Waiting for sorting to finish, then capturing result as a data asset with params:\n{asset_capture_params.to_dict()}")
+    
+    completed_computation = co_client.computations.wait_until_completed(computation=computation, polling_interval=300, timeout=7 * 24 * 3600)
+    
+    logger.info(f"Sorting finished: {completed_computation.end_status}")
+    
+    assert completed_computation.id == computation.id, f"Completed computation ID {completed_computation.id!r} does not match the original computation ID {computation.id!r}: something wrong with computation wait code or codeocean API has changed"
+    
+    logger.info("Capturing result as sorted data asset")
+    captured_asset = co_client.data_assets.create_data_asset(data_asset_params=asset_capture_params)
+    ready_captured_asset = co_client.data_assets.wait_until_ready(data_asset=captured_asset, polling_interval=10, timeout=300)
+    assert ready_captured_asset.id == captured_asset.id, f"Asset ID after waiting for readiness {ready_captured_asset.id!r} does not match the original captured asset ID {captured_asset.id!r}: something wrong with asset capture code or codeocean API has changed"
 
-
+    co_client.data_assets.update_permissions(
+        data_asset_id=captured_asset.id,
+        permissions=Permissions(everyone="viewer", share_assets=True)
+    )
+    logger.info(f"Captured sorted data asset with ID {captured_asset.id!r} and updated permissions.")
+    
 if __name__ == "__main__":
     main()
