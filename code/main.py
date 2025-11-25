@@ -82,12 +82,6 @@ parser.add_argument(
     help="Bucket to save data to",
     nargs="?",
 )
-parser.add_argument(
-    "resume_run_id",
-    type=str,
-    help="Computation ID of a previous run to resume",
-    nargs="?",
-)
 ## SPIKE SORTING SPECIFIC ARGUMENTS
 
 # job dispatch
@@ -232,6 +226,12 @@ parser.add_argument(
     type=str,
     help="Whether to use motion corrected data",
     nargs="?"
+)
+parser.add_argument(
+    "resume_run_id",
+    type=str,
+    help="Computation ID of a previous run to resume",
+    nargs="?",
 )
 
 
