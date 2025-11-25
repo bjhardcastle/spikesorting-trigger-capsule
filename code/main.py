@@ -460,7 +460,7 @@ def main():
             alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {input_data_asset_info.name}")
     
     logger.info("Preparing data asset capture parameters")
-    captured_asset_name = f"{input_data_asset_info.name}_{job_config.captured_asset_label}_{datetime.datetime.now().isoformat(sep='_', timespec='seconds')}"
+    captured_asset_name = f"{input_data_asset_info.name}_{job_config.captured_asset_label}_{datetime.datetime.now().isoformat(sep='_', timespec='seconds').replace(':', '-')}"
     platform, subject_id = input_data_asset_info.name.split("_")[:2]
     if output_bucket is not None:
         source = Source(
