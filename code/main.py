@@ -13,7 +13,7 @@ from typing import Optional
 from aind_codeocean_utils.alert_bot import AlertBot
 from dotenv import load_dotenv
 from codeocean.client import CodeOcean as CodeOceanClient
-from codeocean.computation import RunParams, DataAssetsRunParam, PipelineProcessParams
+from codeocean.computation import RunParams, DataAssetsRunParam, PipelineProcessParams, ComputationEndStatus
 from codeocean.data_asset import DataAssetParams, ComputationSource, Source, Permissions
 
 from job_config_models import get_job_config
@@ -471,6 +471,14 @@ def main():
     completed_computation = co_client.computations.wait_until_completed(computation=computation, polling_interval=300, timeout=7 * 24 * 3600)
     
     logger.info(f"Sorting finished: {completed_computation.end_status}")
+    if not completed_computation.end_status == ComputationEndStatus.Succeeded:
+        logger.error(f"Computation ended with status {completed_computation.end_status}, not 'succeeded'. Not capturing result.")
+        if alert_bot:
+            logger.info("Sending alert")
+            alert_bot.send_message(
+                message=f"Computation for {input_data_asset_info.name} ended with status {completed_computation.end_status}, not 'succeeded'. Result not captured."
+            )
+        exit(1)
     
     assert completed_computation.id == computation.id, f"Completed computation ID {completed_computation.id!r} does not match the original computation ID {computation.id!r}: something wrong with computation wait code or codeocean API has changed"
     
