@@ -37,7 +37,7 @@ class JobConfig(BaseModel):
     process_names: ProcessNames
 
     
-def get_job_config(job_name: str, json_path: str = "/root/capsule/code/json/job_configs.json") -> JobConfig:
+def get_job_config(job_name: str, json_path: str = "job_configs.json") -> JobConfig:
     """
     Get configuration for a specific job type
     
