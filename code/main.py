@@ -506,6 +506,7 @@ def main():
         permissions=Permissions(everyone="viewer", share_assets=True)
     )
     logger.info(f"Captured sorted data asset with ID {captured_asset.id!r} and updated permissions.")
+    logger.info("Done")
     
 if __name__ == "__main__":
     main()
