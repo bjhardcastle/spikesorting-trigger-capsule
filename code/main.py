@@ -82,6 +82,12 @@ parser.add_argument(
     help="Bucket to save data to",
     nargs="?",
 )
+parser.add_argument(
+    "resume_run_id",
+    type=str,
+    help="Computation ID of a previous run to resume",
+    nargs="?",
+)
 ## SPIKE SORTING SPECIFIC ARGUMENTS
 
 # job dispatch
@@ -244,8 +250,7 @@ def main():
     if result_suffix == "":
         result_suffix = None
     output_bucket: Optional[str] = args.output_bucket
-    if output_bucket == "":
-        output_bucket = None
+    resume_run_id: Optional[str] = args.resume_run_id or None
     input_data_asset_id: str = args.input_data_asset_id
     job_dispatch_split_segments = args.job_dispatch_split_segments
     job_dispatch_split_groups = args.job_dispatch_split_groups
@@ -434,6 +439,7 @@ def main():
         version=job_config.version,
         data_assets=[input_data_asset_params],
         processes=processes,
+        resume_run_id=resume_run_id,
     )
     print(f"Pipeleine run params:\n{run_params.to_dict()}")
 
