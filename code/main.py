@@ -479,6 +479,7 @@ def main():
     ready_captured_asset = co_client.data_assets.wait_until_ready(data_asset=captured_asset, polling_interval=10, timeout=300)
     assert ready_captured_asset.id == captured_asset.id, f"Asset ID after waiting for readiness {ready_captured_asset.id!r} does not match the original captured asset ID {captured_asset.id!r}: something wrong with asset capture code or codeocean API has changed"
 
+    logger.info("Updating captured asset permissions to be viewable by everyone")
     co_client.data_assets.update_permissions(
         data_asset_id=captured_asset.id,
         permissions=Permissions(everyone="viewer", share_assets=True)
