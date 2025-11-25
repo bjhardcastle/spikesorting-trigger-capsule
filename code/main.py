@@ -309,7 +309,7 @@ def main():
     else:
         backend_process = "nwb_subject"
     nwb_backend_process = PipelineProcessParams(
-        name=job_config.process_names[backend_process],
+        name=job_config.process_names.model_dump().get(backend_process),
         parameters=[str(p) for p in nwb_parameters]
     )
 
