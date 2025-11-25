@@ -14,7 +14,7 @@ from aind_codeocean_utils.alert_bot import AlertBot
 from dotenv import load_dotenv
 from codeocean.client import CodeOcean as CodeOceanClient
 from codeocean.computation import RunParams, DataAssetsRunParam, PipelineProcessParams, ComputationEndStatus
-from codeocean.data_asset import DataAssetParams, ComputationSource, Source, Permissions
+from codeocean.data_asset import DataAssetParams, ComputationSource, Source, Permissions, AWSS3Source
 
 from job_config_models import get_job_config
 
@@ -246,10 +246,8 @@ def main():
 
     job_config = get_job_config(args.pipeline_type)
 
-    result_suffix: Optional[str] = args.result_suffix
-    if result_suffix == "":
-        result_suffix = None
-    output_bucket: Optional[str] = args.output_bucket
+    result_suffix: Optional[str] = args.result_suffix or None
+    output_bucket: Optional[str] = args.output_bucket or None
     resume_run_id: Optional[str] = args.resume_run_id or None
     input_data_asset_id: str = args.input_data_asset_id
     job_dispatch_split_segments = args.job_dispatch_split_segments
@@ -461,8 +459,15 @@ def main():
         if alert_bot:
             alert_bot.send_message(message=f"Finished pipeline {job_config.name} for {input_data_asset_info.name}")
     
+    logger.info("Preparing data asset capture parameters")
     captured_asset_name = f"{input_data_asset_info.name}_{job_config.captured_asset_label}_{datetime.datetime.now().isoformat(sep='_', timespec='seconds')}"
     platform, subject_id = input_data_asset_info.name.split("_")[:2]
+    if output_bucket is not None:
+        source = Source(
+            aws=AWSS3Source(bucket=output_bucket, prefix=captured_asset_name)
+        )
+    else:
+        source = Source(computation=ComputationSource(id=computation.id))
     asset_capture_params = DataAssetParams(
         name=captured_asset_name,
         tags=["derived", platform, subject_id],
@@ -472,7 +477,7 @@ def main():
             "experiment type": platform,
             "subject id": subject_id,
         },
-        source=Source(computation=ComputationSource(id=computation.id))
+        source=source,
     )
     print(f"Waiting for sorting to finish, then capturing result as a data asset with params:\n{asset_capture_params.to_dict()}")
     
