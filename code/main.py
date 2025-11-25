@@ -227,13 +227,6 @@ parser.add_argument(
     help="Whether to use motion corrected data",
     nargs="?"
 )
-parser.add_argument(
-    "resume_run_id",
-    type=str,
-    help="Computation ID of a previous run to resume",
-    nargs="?",
-)
-
 
 
 def main():
@@ -248,7 +241,6 @@ def main():
 
     result_suffix: Optional[str] = args.result_suffix or None
     output_bucket: Optional[str] = args.output_bucket or None
-    resume_run_id: Optional[str] = args.resume_run_id or None
     input_data_asset_id: str = args.input_data_asset_id
     job_dispatch_split_segments = args.job_dispatch_split_segments
     job_dispatch_split_groups = args.job_dispatch_split_groups
@@ -437,7 +429,6 @@ def main():
         version=job_config.version,
         data_assets=[input_data_asset_params],
         processes=processes,
-        resume_run_id=resume_run_id,
     )
     print(f"Pipeleine run params:\n{run_params.to_dict()}")
 
